@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block content %}
+
+<h2 class="page-title">🩺 Source Health</h2>
+
+<div class="glass-card p-4">
+    <table class="table table-dark table-hover text-center align-middle">
+        <thead class="table-secondary text-dark">
+            <tr>
+                <th>Source Key</th>
+                <th>Status</th>
+                <th>Checked At</th>
+                <th>Message</th>
+            </tr>
+        </thead>
+        <tbody>
+        {% for h in rows %}
+            <tr>
+                <td>{{ h.source_key }}</td>
+                <td>
+                    {% if h.status == 'OK' %}
+                        <span class="badge bg-success">OK</span>
+                    {% else %}
+                        <span class="badge bg-danger">ERROR</span>
+                    {% endif %}
+                </td>
+                <td>{{ h.checked_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                <td class="text-start">{{ h.message }}</td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+{% endblock %}

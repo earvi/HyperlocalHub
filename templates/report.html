@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <h2 class="page-title">📢 Report an Incident</h2>
+
+        <div class="glass-card p-4">
+            <form method="POST" id="reportForm">
+                <div class="mb-3">
+                    <label class="form-label">Title</label>
+                    <input type="text" name="title" class="form-control"
+                        placeholder="e.g. Major Accident at Baker Junction" required>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">Category</label>
+                    <select name="category" class="form-select" required>
+                        <option value="Traffic">Traffic</option>
+                        <option value="University">University</option>
+                        <option value="Weather">Weather</option>
+                        <option value="Safety">Safety</option>
+                        <option value="Other">Other</option>
+                    </select>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">Description</label>
+                    <textarea name="description" class="form-control" rows="3"
+                        placeholder="Describe what happened..."></textarea>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">Location (Click on map to pick)</label>
+                    <div id="map" style="height: 300px; border-radius: 12px; margin-bottom: 10px;"></div>
+                    <input type="text" name="location" id="locationInput" class="form-control mb-2"
+                        placeholder="Location Name (e.g. Near Main Gate)" required>
+                    <div class="row">
+                        <div class="col">
+                            <input type="text" name="lat" id="latInput" class="form-control" placeholder="Latitude"
+                                readonly required>
+                        </div>
+                        <div class="col">
+                            <input type="text" name="lon" id="lonInput" class="form-control" placeholder="Longitude"
+                                readonly required>
+                        </div>
+                    </div>
+                </div>
+
+                <button type="submit" class="btn btn-primary w-100">Submit Report</button>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Leaflet CSS & JS -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.3/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.3/dist/leaflet.js"></script>
+
+<script>
+    // Initialize map
+    var map = L.map('map').setView([9.5916, 76.5222], 13); // Default to Kottayam
+
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+        subdomains: 'abcd',
+        maxZoom: 20
+    }).addTo(map);
+
+    var marker;
+
+    map.on('click', function (e) {
+        var lat = e.latlng.lat;
+        var lon = e.latlng.lng;
+
+        if (marker) {
+            map.removeLayer(marker);
+        }
+        marker = L.marker([lat, lon]).addTo(map);
+
+        document.getElementById('latInput').value = lat.toFixed(6);
+        document.getElementById('lonInput').value = lon.toFixed(6);
+    });
+</script>
+{% endblock %}

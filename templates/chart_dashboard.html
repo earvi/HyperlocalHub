@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block content %}
+
+<h2 class="page-title">📊 Analytics</h2>
+
+<div class="glass-card p-4">
+    <canvas id="categoryChart" height="100"></canvas>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<script>
+const ctx = document.getElementById("categoryChart");
+
+new Chart(ctx, {
+    type: "bar",
+    data: {
+        labels: {{ category_labels|safe }},
+        datasets: [{
+            label: "Number of Alerts",
+            data: {{ category_values|safe }},
+            backgroundColor: "rgba(79, 195, 247, 0.6)",
+            borderColor: "#0288d1",
+            borderWidth: 1
+        }]
+    },
+    options: {
+        plugins: { legend: { labels: { color: "#000" } } },
+        scales: {
+            x: { ticks: { color: "#000" } },
+            y: { ticks: { color: "#000" } }
+        }
+    }
+});
+</script>
+
+{% endblock %}

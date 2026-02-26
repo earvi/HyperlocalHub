@@ -1,0 +1,166 @@
+{% extends "base.html" %}
+{% block content %}
+
+<h2 class="page-title">📊 Analytics Dashboard</h2>
+
+<div class="row g-4">
+    {% if is_admin %}
+    <!-- User Growth (Admin Only) -->
+    <div class="col-12">
+        <div class="glass-card p-4">
+            <h4 class="mb-4">User Growth (Last 7 Days)</h4>
+            <div style="height: 300px; position: relative;">
+                <canvas id="userChart"></canvas>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Alerts Trend Chart (Line) -->
+    <div class="col-md-6">
+        <div class="glass-card p-4 h-100">
+            <h4 class="mb-4">Alerts Trend (Last 7 Days)</h4>
+            <div style="height: 300px; position: relative;">
+                <canvas id="trendChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- Source Chart (Doughnut) -->
+    <div class="col-md-6">
+        <div class="glass-card p-4 h-100">
+            <h4 class="mb-4">Top Sources</h4>
+            <div style="height: 300px; position: relative;">
+                <canvas id="sourceChart"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<script>
+    // Theme Colors
+    const colorText = "#ffffff";
+    const colorGrid = "rgba(255, 255, 255, 0.1)";
+    const colorPrimary = "#d4f234";
+    const colorPrimaryAlpha = "rgba(212, 242, 52, 0.2)";
+
+    const chartDefaults = {
+        color: colorText,
+        borderColor: colorGrid
+    };
+
+    Chart.defaults.color = colorText;
+    Chart.defaults.borderColor = colorGrid;
+
+    // 2. Alerts Trend Chart (Line)
+    const trendCtx = document.getElementById("trendChart");
+    if (trendCtx) {
+        new Chart(trendCtx, {
+            type: 'line',
+            data: {
+                labels: {{ trend_dates| tojson }},
+    datasets: [{
+        label: 'Alerts',
+        data: {{ trend_counts| tojson }},
+        borderColor: '#00f2fe',
+        backgroundColor: 'rgba(0, 242, 254, 0.2)',
+        borderWidth: 2,
+        fill: true,
+        tension: 0.4,
+        pointRadius: 4,
+        pointHoverRadius: 6
+            }]
+        },
+    options: {
+        responsive: true,
+            maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+        scales: {
+            y: {
+                beginAtZero: true,
+                    grid: { color: "rgba(255,255,255,0.1)" },
+                ticks: { stepSize: 1, color: '#fff' }
+            },
+            x: {
+                grid: { display: false },
+                ticks: { color: '#fff' }
+            }
+        }
+    }
+    });
+    }
+
+
+
+    // 3. Source Chart
+    new Chart(document.getElementById("sourceChart"), {
+        type: 'doughnut',
+        data: {
+            labels: {{ src_labels| tojson }},
+        datasets: [{
+            data: {{ src_values| tojson }},
+        backgroundColor: [
+            '#d4f234',
+            '#00f2fe',
+            '#4facfe',
+            '#ff4d4d',
+            '#b3b3b3'
+        ],
+        borderWidth: 0
+            }]
+        },
+        options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        cutout: '60%',
+        plugins: {
+            legend: { position: 'right', labels: { color: '#fff' } }
+        }
+    }
+    });
+
+    {% if is_admin %}
+    // 4. User Growth Chart
+    const userDates = {{ user_dates| tojson }};
+    const userCounts = {{ user_counts| tojson }};
+
+    if (userDates && userCounts) {
+        new Chart(document.getElementById("userChart"), {
+            type: 'line',
+            data: {
+                labels: userDates,
+                datasets: [{
+                    label: 'New Users',
+                    data: userCounts,
+                    borderColor: '#c084fc', // Purple accent
+                    backgroundColor: 'rgba(192, 132, 252, 0.2)',
+                    borderWidth: 2,
+                    fill: true,
+                    tension: 0.4,
+                    pointRadius: 4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        grid: { color: "rgba(255,255,255,0.1)" },
+                        ticks: { stepSize: 1, color: '#fff' }
+                    },
+                    x: {
+                        grid: { display: false },
+                        ticks: { color: '#fff' }
+                    }
+                }
+            }
+        });
+    }
+    {% endif %}
+</script>
+
+{% endblock %}

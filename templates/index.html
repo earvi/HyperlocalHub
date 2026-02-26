@@ -1,0 +1,117 @@
+{% extends "base.html" %}
+{% block content %}
+
+<h2 class="page-title">📢 Latest Alerts</h2>
+
+<div class="glass-card p-4 mb-4">
+    <form class="row g-3" method="get">
+        <div class="col-md-5">
+            <input name="q" class="form-control" placeholder="Search..." value="{{ q }}">
+        </div>
+
+        <div class="col-md-4">
+            <select name="category" class="form-select">
+                <option value="" {% if not category %}selected{% endif %}>All Categories</option>
+                <option value="University" {% if category=='University' %}selected{% endif %}>University</option>
+                <option value="Traffic" {% if category=='Traffic' %}selected{% endif %}>Traffic</option>
+                <option value="Weather" {% if category=='Weather' %}selected{% endif %}>Weather</option>
+                <option value="General" {% if category=='General' %}selected{% endif %}>General</option>
+            </select>
+        </div>
+
+        <div class="col-md-3">
+            <button class="btn btn-primary w-100">
+                <i class="bi bi-search"></i> Filter
+            </button>
+        </div>
+    </form>
+</div>
+
+{% if alerts %}
+{% for a in alerts %}
+<div class="glass-card alert-card alert-animation p-4 mb-3">
+    <div class="d-flex justify-content-between align-items-start">
+        <div>
+            <h5 class="mb-1">
+                {% if a.url %}
+                <a href="{{ a.url }}" target="_blank" rel="noopener noreferrer"
+                    class="text-decoration-none alert-title">
+                    {{ a.title }}
+                </a>
+                {% else %}
+                {{ a.title }}
+                {% endif %}
+            </h5>
+            <small class="text-muted d-flex align-items-center">
+                <i class="bi bi-clock-history me-1"></i>
+                {{ (a.published_at or a.fetched_at).strftime('%Y-%m-%d %H:%M') if (a.published_at or a.fetched_at) else
+                '' }}
+                &nbsp;•&nbsp;
+                <span class="text-muted">{{ a.source }}</span>
+            </small>
+        </div>
+
+        <div class="d-flex flex-column align-items-end">
+            <div class="d-flex align-items-center gap-2 mb-2">
+                {% if a.lat and a.lon %}
+                <a href="{{ url_for('main.map_view', lat=a.lat, lon=a.lon) }}"
+                    class="badge glass-card text-decoration-none text-accent" title="View Location on Map">
+                    <i class="bi bi-geo-alt-fill"></i> Map
+                </a>
+                {% endif %}
+
+                <span class="category-badge {{ (a.category or 'general')|lower }}">
+                    {{ a.category or "General" }}
+                </span>
+            </div>
+
+            <div class="d-flex gap-2 mt-2">
+
+
+                <!-- Comment Button Removed (Moved to Map) -->
+
+                <button class="btn btn-sm btn-action bookmark-btn" data-alert-id="{{ a.id }}">
+                    {% if a.id in bookmarked_ids %}
+                    <i class="bi bi-star-fill text-warning"></i>
+                    {% else %}
+                    <i class="bi bi-star"></i>
+                    {% endif %}
+                </button>
+            </div>
+        </div>
+    </div>
+
+    {% if a.summary %}
+    <p class="mt-2 mb-0">{{ a.summary }}</p>
+    {% endif %}
+
+    <!-- Comments Section Removed (Moved to Map) -->
+</div>
+{% endfor %}
+{% else %}
+<div class="glass-card p-4">
+    <p class="mb-0 text-muted">No alerts found. Try different filters or wait for the next update.</p>
+</div>
+{% endif %}
+
+{% if total_pages > 1 %}
+<nav aria-label="Alerts pagination">
+    <ul class="pagination mt-3">
+        <li class="page-item {% if page == 1 %}disabled{% endif %}">
+            <a class="page-link" href="?q={{ q }}&category={{ category }}&page={{ page-1 }}">Previous</a>
+        </li>
+
+        {% for p in range(1, total_pages + 1) %}
+        <li class="page-item {% if p == page %}active{% endif %}">
+            <a class="page-link" href="?q={{ q }}&category={{ category }}&page={{ p }}">{{ p }}</a>
+        </li>
+        {% endfor %}
+
+        <li class="page-item {% if page == total_pages %}disabled{% endif %}">
+            <a class="page-link" href="?q={{ q }}&category={{ category }}&page={{ page+1 }}">Next</a>
+        </li>
+    </ul>
+</nav>
+{% endif %}
+
+{% endblock %}

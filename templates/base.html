@@ -1,0 +1,214 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+
+<head>
+    <meta charset="utf-8">
+    <title>{{ title if title else "Hyperlocal Hub" }}</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <!-- Google Font -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@300;400;500;600;700;800&display=swap"
+        rel="stylesheet">
+
+    <!-- Bootstrap -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+
+    <!-- Bootstrap Icons -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+
+    <!-- Socket.IO -->
+    <script src="https://cdn.socket.io/4.7.4/socket.io.min.js"
+        integrity="sha384-Gr6Lu2Ajx28zhqhGYOjfcxafNSZ3P1RuM1tr1oliqrlwU2XM7mZ6J5g6yHvNGK2h"
+        crossorigin="anonymous"></script>
+
+    <script>
+        // Prevent FOUC (Flash of Unstyled Content)
+        const saved = localStorage.getItem("hl_theme") || "dark";
+        document.documentElement.setAttribute("data-theme", saved);
+    </script>
+</head>
+
+<body>
+
+    <!-- Sidebar -->
+    <button class="mobile-toggle" id="sidebarToggle">
+        <i class="bi bi-list"></i>
+    </button>
+
+    <div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+    <aside class="sidebar" role="navigation" id="sidebar">
+        <div class="sidebar-title">
+            <i class="bi bi-broadcast-pin"></i>
+            <i class="bi bi-broadcast-pin"></i>
+            <span>Hyperlocal Hub</span>
+        </div>
+
+        <!-- Language Selector -->
+        <div class="mb-4">
+            <div id="google_translate_element"></div>
+        </div>
+
+        <!-- Navigation Links -->
+        <!-- Navigation Links -->
+        <a href="{{ url_for('main.index') }}"
+            class="sidebar-link {% if request.endpoint == 'main.index' and not request.args.get('lat') %}active{% endif %}">
+            <i class="bi bi-house"></i>
+            <span>Home</span>
+        </a>
+
+        <a href="#" onclick="getNearMe(event)"
+            class="sidebar-link {% if request.endpoint == 'main.map_view' %}active{% endif %}">
+            <i class="bi bi-map"></i>
+            <span>Live Map (Nearby)</span>
+        </a>
+
+
+
+        <a href="{{ url_for('main.report_incident') }}"
+            class="sidebar-link {% if request.endpoint == 'main.report_incident' %}active{% endif %}">
+            <i class="bi bi-megaphone"></i>
+            <span>Report Incident</span>
+        </a>
+
+        {% if session.get('admin') %}
+        <a href="{{ url_for('admin.moderation') }}"
+            class="sidebar-link {% if request.endpoint == 'admin.moderation' %}active{% endif %}">
+            <i class="bi bi-shield-check"></i>
+            <span>Moderation Queue</span>
+        </a>
+
+        <a href="{{ url_for('admin.alerts') }}"
+            class="sidebar-link {% if request.endpoint == 'admin.alerts' %}active{% endif %}">
+            <i class="bi bi-bell"></i>
+            <span>Manage Alerts</span>
+        </a>
+        {% endif %}
+
+        {% if not session.get('admin') %}
+        <a href="{{ url_for('admin.sources') }}"
+            class="sidebar-link {% if request.endpoint == 'admin.sources' %}active{% endif %}">
+            <i class="bi bi-diagram-3"></i>
+            <span>Manage Sources</span>
+        </a>
+        {% endif %}
+
+        {% if session.get('admin') %}
+        <a href="{{ url_for('admin.dashboard') }}"
+            class="sidebar-link {% if request.endpoint == 'admin.dashboard' %}active{% endif %}">
+            <i class="bi bi-speedometer2"></i>
+            <span>Admin Dashboard</span>
+        </a>
+
+        <a href="{{ url_for('main.stats') }}"
+            class="sidebar-link {% if request.endpoint == 'main.stats' %}active{% endif %}">
+            <i class="bi bi-bar-chart"></i>
+            <span>Charts</span>
+        </a>
+
+        <a href="{{ url_for('admin.health') }}"
+            class="sidebar-link {% if request.endpoint == 'admin.health' %}active{% endif %}">
+            <i class="bi bi-heart-pulse"></i>
+            <span>Source Health</span>
+        </a>
+
+        <a href="{{ url_for('auth.admin_logout') }}" class="sidebar-link">
+            <i class="bi bi-box-arrow-right"></i>
+            <span>Logout</span>
+        </a>
+
+        {% elif session.get('user_id') %}
+        <a href="{{ url_for('main.user_settings') }}"
+            class="sidebar-link {% if request.endpoint == 'main.user_settings' %}active{% endif %}">
+            <i class="bi bi-gear"></i>
+            User Dashboard
+        </a>
+
+
+
+        <a href="{{ url_for('main.stats') }}" class="sidebar-link">
+            <i class="bi bi-bar-chart"></i>
+            Analytics
+        </a>
+
+        <a href="{{ url_for('auth.admin_logout') }}" class="sidebar-link">
+            <i class="bi bi-box-arrow-right"></i>
+            <span>Logout</span>
+        </a>
+
+        {% else %}
+        <a href="{{ url_for('auth.admin_login') }}"
+            class="sidebar-link {% if request.endpoint == 'auth.admin_login' %}active{% endif %}">
+            <i class="bi bi-person-lock"></i>
+            <span>Login / Register</span>
+        </a>
+        {% endif %}
+    </aside>
+
+    <!-- Flash Messages (Overlay) -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+    <div
+        style="position: fixed; top: 20px; left: 50%; transform: translateX(-50%); z-index: 99999; width: 90%; max-width: 600px;">
+        {% for category, message in messages %}
+        {% set alert_class = 'danger' if category == 'error' else 'success' if category == 'success' else 'warning' if
+        category == 'warning' else 'info' %}
+        {% set icon = 'exclamation-circle' if category == 'error' else 'check-circle' if category == 'success' else
+        'exclamation-triangle' if category == 'warning' else 'info-circle' %}
+
+        <div class="alert alert-{{ alert_class }} shadow-lg d-flex align-items-center text-white border-0 glass-card"
+            role="alert" style="background-color: var(--bs-{{ alert_class }});">
+            <i class="bi bi-{{ icon }}-fill fs-4 me-3"></i>
+            <div>
+                <strong>{{ message }}</strong>
+            </div>
+            <button type="button" class="btn-close btn-close-white ms-auto" data-bs-dismiss="alert"
+                aria-label="Close"></button>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+    {% endwith %}
+
+    <!-- Main Content -->
+    <main class="main-content" role="main">
+        {% block content %}{% endblock %}
+    </main>
+
+
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+
+
+
+    <!-- App JS -->
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+
+    <!-- Google Translate -->
+    <script type="text/javascript">
+        function googleTranslateElementInit() {
+            new google.translate.TranslateElement({
+                pageLanguage: 'en',
+                includedLanguages: 'en,hi,ta,ml,te,bn,gu,kn,mr,pa,ur',
+                layout: google.translate.TranslateElement.InlineLayout.SIMPLE
+            }, 'google_translate_element');
+        }
+    </script>
+    <script type="text/javascript"
+        src="//translate.google.com/translate_a/element.js?cb=googleTranslateElementInit"></script>
+
+
+
+    <!-- Toast Container -->
+    <div class="toast-container position-fixed top-0 end-0 p-3" style="z-index: 1050;"></div>
+
+</body>
+
+</html>

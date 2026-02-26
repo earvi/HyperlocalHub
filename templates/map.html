@@ -1,0 +1,314 @@
+{% extends "base.html" %}
+<!-- FIX 2026-02-18 -->
+{% block content %}
+<div class="container-fluid p-0">
+    <div class="d-flex justify-content-between align-items-center px-4 py-3">
+        <h2 class="page-title mb-0">Live Alert Map</h2>
+        <div class="d-flex gap-2">
+            <span class="badge bg-dark glass-card"><i class="bi bi-geo-alt-fill text-danger"></i> {{ alerts|length }}
+                Locations</span>
+        </div>
+    </div>
+
+    <!-- Map Container -->
+    <div style="position: relative; height: 75vh; width: 100%; display: flex;">
+        <div id="map" style="flex-grow: 1; height: 100%; border-radius: 0; z-index: 1;"></div>
+
+        <!-- Chat Panel (Hidden by default) -->
+        <div id="mapChatPanel" class="glass-card border-start border-glass d-none"
+            style="width: 350px; height: 100%; position: absolute; right: 0; top: 0; z-index: 1001; border-radius: 0; display: flex; flex-direction: column;">
+
+            <div class="d-flex justify-content-between align-items-center p-3 border-bottom border-glass">
+                <h5 class="mb-0 fs-6"><i class="bi bi-chat-dots-fill text-primary me-2"></i>Live Chat</h5>
+                <button class="btn-close btn-close-white" onclick="closeMapChat()"></button>
+            </div>
+
+            <div id="mapChatTitle" class="p-2 bg-dark bg-opacity-50 small text-truncate fw-bold text-center">
+                Select an alert...
+            </div>
+
+            <div id="mapChatMessages" class="flex-grow-1 p-3 overflow-auto" style="scrollbar-width: thin;">
+                <!-- Messages go here -->
+            </div>
+
+            <div class="p-3 border-top border-glass bg-dark bg-opacity-25">
+                <form id="mapChatForm" class="d-flex gap-2">
+                    <input type="hidden" id="mapChatAlertId">
+                    <input type="text" id="mapChatInput" class="form-control form-control-sm" placeholder="Type..."
+                        autocomplete="off" required>
+                    <button type="submit" class="btn btn-sm btn-primary"><i class="bi bi-send-fill"></i></button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Locate Me Button -->
+        <button id="locateBtn" class="btn btn-primary shadow-lg"
+            style="position: absolute; bottom: 20px; left: 20px; z-index: 1000; border-radius: 50%; width: 50px; height: 50px; display: flex; align-items: center; justify-content: center;"
+            onclick="locateUser()">
+            <i class="bi bi-crosshair fs-4"></i>
+        </button>
+    </div>
+</div>
+
+
+
+<!-- Leaflet CSS & JS -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+    integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+
+<script>
+    // 1. Global Setup
+    window.alertLookup = {};
+    window.currentChatRoom = null;
+    window.socket = null;
+    window.currentUser = "{{ session.get('username', '') }}" || "Anonymous";
+
+    // Safely Initialize Socket.IO
+    try {
+        if (typeof io !== 'undefined') {
+            window.socket = io();
+        } else {
+            console.warn("Socket.IO library not found. Chat disabled.");
+        }
+    } catch (e) {
+        console.error("Socket.IO init error:", e);
+    }
+
+    // Global Chat Function
+    window.openMapChat = function (alertId) {
+        console.log("Chat clicked for:", alertId);
+
+        const alertData = window.alertLookup[alertId];
+        if (!alertData) {
+            console.error("Alert not found in lookup:", alertId);
+            return;
+        }
+
+        const panel = document.getElementById('mapChatPanel');
+        const titleEl = document.getElementById('mapChatTitle');
+        const inputId = document.getElementById('mapChatAlertId');
+
+        // Update UI
+        titleEl.textContent = alertData.title;
+        inputId.value = alertId;
+        panel.classList.remove('d-none');
+
+        // Socket Room Management (Only if socket exists)
+        if (window.socket) {
+            if (window.currentChatRoom) {
+                window.socket.emit('leave_alert', { alert_id: window.currentChatRoom });
+            }
+            window.currentChatRoom = alertId;
+            window.socket.emit('join_alert', { alert_id: alertId });
+        } else {
+            console.warn("Cannot join room: Socket not connected");
+        }
+
+        // Load Messages (REST API fallback works without socket)
+        loadMapMessages(alertId);
+    };
+
+    window.closeMapChat = function () {
+        const panel = document.getElementById('mapChatPanel');
+        panel.classList.add('d-none');
+        if (window.socket && window.currentChatRoom) {
+            window.socket.emit('leave_alert', { alert_id: window.currentChatRoom });
+            window.currentChatRoom = null;
+        }
+    };
+
+    async function loadMapMessages(alertId) {
+        const msgs = document.getElementById('mapChatMessages');
+        msgs.innerHTML = '<div class="text-center text-muted small mt-5"><div class="spinner-border spinner-border-sm text-primary mb-2"></div><br>Loading...</div>';
+
+        try {
+            const res = await fetch(`/alert/${alertId}/comments`);
+            const data = await res.json();
+
+            if (data.ok) {
+                if (data.comments.length === 0) {
+                    msgs.innerHTML = `
+                        <div class="text-center mt-5 opacity-50">
+                            <i class="bi bi-chat-square-text fs-1 mb-2"></i>
+                            <p class="small">No messages yet.<br>Be the first to say hello!</p>
+                        </div>`;
+                } else {
+                    msgs.innerHTML = data.comments.map(renderMessage).join("");
+                    scrollToBottom();
+                }
+            }
+        } catch (e) {
+            msgs.innerHTML = '<div class="text-danger small text-center mt-5">Failed to load messages.</div>';
+        }
+    }
+
+    function renderMessage(c) {
+        // Determine ownership: match session username OR explicit is_owner flag
+        const isMine = (c.user === window.currentUser) || c.is_owner === true;
+        const msgClass = isMine ? 'mine' : 'others';
+
+        // Format time (simple cleanup)
+        let timeDisplay = c.created_at;
+        if (c.created_at.includes(' ')) {
+            timeDisplay = c.created_at.split(' ')[1]; // HH:MM
+        }
+
+        return `
+            <div class="chat-message ${msgClass}">
+                <div class="chat-meta">
+                    <span class="chat-username">${c.user}</span>
+                    <span class="chat-time">${timeDisplay}</span>
+                </div>
+                <div class="chat-bubble">
+                    ${c.text}
+                </div>
+            </div>
+        `;
+    }
+
+    function scrollToBottom() {
+        const msgs = document.getElementById('mapChatMessages');
+        msgs.scrollTop = msgs.scrollHeight;
+    }
+
+    // Socket Listener
+    if (window.socket) {
+        window.socket.on('new_comment', (data) => {
+            if (window.currentChatRoom == data.alert_id) {
+                const msgs = document.getElementById('mapChatMessages');
+                // Remove "empty state" if present
+                if (msgs.querySelector('.bi-chat-square-text')) msgs.innerHTML = "";
+
+                msgs.insertAdjacentHTML('beforeend', renderMessage(data));
+                scrollToBottom();
+            }
+        });
+    }
+
+    document.addEventListener("DOMContentLoaded", function () {
+        // Initialize Map
+        const map = L.map('map');
+        window.mapInstance = map;
+
+        // Center Map
+        const urlParams = new URLSearchParams(window.location.search);
+        const latParam = parseFloat(urlParams.get('lat'));
+        const lonParam = parseFloat(urlParams.get('lon'));
+
+        if (latParam && lonParam) {
+            map.setView([latParam, lonParam], 16);
+        } else {
+            map.setView([9.6548, 76.5413], 13);
+        }
+
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+            attribution: '&copy; OpenStreetMap contributors &copy; CARTO',
+            subdomains: 'abcd',
+            maxZoom: 19
+        }).addTo(map);
+
+        // Load Alerts
+        const activeAlerts = {{ alerts | tojson }} || [];
+
+    activeAlerts.forEach(alert => {
+        // Add to Global Lookup
+        window.alertLookup[alert.id] = alert;
+
+        if (alert.lat && alert.lon) {
+            const isVerified = alert.verified !== false;
+            const markerColor = isVerified ? "#ff4d4d" : "#ffbd4d";
+
+            const marker = L.circleMarker([alert.lat, alert.lon], {
+                radius: 8, fillColor: markerColor, color: "#fff", weight: 2, opacity: 1, fillOpacity: 0.9
+            }).addTo(map);
+
+            const statusBadge = isVerified
+                ? `<span class="badge bg-danger mb-2">Verified</span>`
+                : `<span class="badge bg-warning text-dark mb-2">User Report</span>`;
+
+            // Uses inline onclick to bypass Leaflet event blocking
+            const popupContent = `
+                    <div style="min-width: 220px;">
+                        <h6 class="fw-bold mb-1">${alert.title}</h6>
+                        ${statusBadge}
+                        <span class="badge bg-secondary mb-2 ms-1">${alert.category}</span>
+                        <p class="small text-muted mb-2">${alert.summary ? alert.summary.substring(0, 80) + '...' : ''}</p>
+                        
+                        <div class="d-grid gap-2">
+                             ${isVerified ? `<a href="${alert.url}" target="_blank" class="btn btn-sm btn-outline-light">View Details</a>` : ''}
+                             <button class="btn btn-sm btn-primary" type="button" onclick="window.openMapChat(${alert.id})">
+                                <i class="bi bi-chat-dots-fill me-1"></i> Live Chat
+                             </button>
+                        </div>
+                    </div>
+                `;
+            marker.bindPopup(popupContent);
+
+            if (latParam && lonParam &&
+                Math.abs(alert.lat - latParam) < 0.0001 &&
+                Math.abs(alert.lon - lonParam) < 0.0001) {
+                marker.openPopup();
+            }
+        }
+    });
+
+    // Chat Form Submit
+    const form = document.getElementById('mapChatForm');
+    if (form) {
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const input = document.getElementById('mapChatInput');
+            const alertId = document.getElementById('mapChatAlertId').value;
+            const text = input.value.trim();
+
+            if (!text || !alertId) return;
+
+            try {
+                await fetch(`/alert/${alertId}/comment`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ text })
+                });
+                input.value = "";
+            } catch (err) {
+                console.error(err);
+            }
+        });
+    }
+    });
+
+    function locateUser() {
+        const btn = document.getElementById('locateBtn');
+        const icon = btn.querySelector('i');
+        if (!navigator.geolocation) {
+            alert("Geolocation is not supported"); return;
+        }
+        icon.className = "spinner-border spinner-border-sm";
+        btn.disabled = true;
+
+        navigator.geolocation.getCurrentPosition(
+            (position) => {
+                const lat = position.coords.latitude;
+                const lon = position.coords.longitude;
+                icon.className = "bi bi-crosshair fs-4";
+                btn.disabled = false;
+                const map = window.mapInstance;
+                if (map) {
+                    map.setView([lat, lon], 16);
+                    if (window.userMarker) map.removeLayer(window.userMarker);
+                    window.userMarker = L.circleMarker([lat, lon], {
+                        radius: 8, fillColor: "#0d6efd", color: "#fff", weight: 2, opacity: 1, fillOpacity: 0.8
+                    }).addTo(map).bindPopup("<b>You are here</b>").openPopup();
+                }
+            },
+            (error) => {
+                alert("Location not found.");
+                icon.className = "bi bi-crosshair fs-4";
+                btn.disabled = false;
+            }
+        );
+    }
+</script>
+{% endblock %}

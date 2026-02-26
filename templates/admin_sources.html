@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% block content %}
+
+<h2 class="page-title">🌐 Manage Sources</h2>
+
+<div class="glass-card p-4 mb-4">
+    <form method="POST" class="row g-3" id="sourceForm">
+        <div class="col-12 mb-2">
+            <label class="small text-muted mb-1">Quick Add from Presets:</label>
+            <select class="form-select form-select-sm bg-dark text-light border-secondary" id="presetSelect">
+                <option value="">-- Select a recommended source --</option>
+                {% for p in presets %}
+                <option value='{{ p|tojson }}'>{{ p.name }} ({{ p.category }})</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="col-md-4">
+            <input name="name" id="sourceName" class="form-control" placeholder="Source Name" required>
+        </div>
+        <div class="col-md-4">
+            <input name="url" id="sourceUrl" class="form-control" placeholder="Source URL" required>
+        </div>
+        <div class="col-md-3">
+            <select name="category" id="sourceCategory" class="form-select" required>
+                <option value="University">University</option>
+                <option value="Traffic">Traffic</option>
+                <option value="Weather">Weather</option>
+                <option value="General">General</option>
+            </select>
+        </div>
+        <div class="col-md-1">
+            <button class="btn btn-primary w-100"><i class="bi bi-plus-lg"></i></button>
+        </div>
+    </form>
+
+    <script>
+        document.getElementById('presetSelect').addEventListener('change', function () {
+            if (!this.value) return;
+            const data = JSON.parse(this.value);
+            document.getElementById('sourceName').value = data.name;
+            document.getElementById('sourceUrl').value = data.url;
+            document.getElementById('sourceCategory').value = data.category;
+        });
+    </script>
+</div>
+
+<div class="glass-card p-4">
+    <table class="table table-dark table-hover text-center align-middle">
+        <thead class="table-secondary text-dark">
+            <tr>
+                <th>ID</th>
+                <th>Name</th>
+                <th>URL</th>
+                <th>Category</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for s in sources %}
+            <tr>
+                <td>{{ s.id }}</td>
+                <td>{{ s.name }}</td>
+                <td class="text-start">{{ s.url }}</td>
+                <td>{{ s.category }}</td>
+                <td>
+                    <form action="{{ url_for('admin.delete_source', source_id=s.id) }}" method="POST"
+                        onsubmit="return confirm('Are you sure you want to delete this source?');">
+                        <button type="submit" class="btn btn-sm btn-danger"><i class="bi bi-trash"></i></button>
+                    </form>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+{% endblock %}

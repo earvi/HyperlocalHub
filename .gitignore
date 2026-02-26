@@ -1,0 +1,18 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.env
+
+# Build/Pyinstaller
+build/
+dist/
+*.spec
+
+# Database
+hyperlocal.db
+indexdir/
+
+# IDE
+.vscode/
