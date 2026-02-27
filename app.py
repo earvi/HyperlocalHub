@@ -20,8 +20,8 @@ app = Flask(__name__)
 app.secret_key = "supersecretkey-change-me"
 app.config['SESSION_TYPE'] = 'filesystem' 
 
-# Initialize SocketIO explicitly with threading for PyInstaller compatibility
-socketio = SocketIO(app, cors_allowed_origins="*", async_mode="threading")
+# Initialize SocketIO
+socketio = SocketIO(app, cors_allowed_origins="*")
 
 # Initialize database
 # init_db() 
