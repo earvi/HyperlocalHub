@@ -4,7 +4,7 @@ PRESET_SOURCES = [
     # --- Major Universities ---
     {
         "name": "MGU University News",
-        "url": "https://www.mgu.ac.in/uploads/tor/news.html", 
+        "url": "https://www.mgu.ac.in/", 
         "category": "University"
     },
     {
